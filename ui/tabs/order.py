@@ -47,6 +47,21 @@ class TestSelectionDialog(QDialog):
                 padding: 6px 10px; font-size: 13px; color: #2d3748;
                 min-height: 35px;
             }
+            QListWidget::indicator {
+                width: 18px;
+                height: 18px;
+                background-color: #ffffff;
+                border: 2px solid #e2e8f0;
+                border-radius: 4px;
+            }
+            QListWidget::indicator:checked {
+                background-color: #4a90e2;
+                border-color: #4a90e2;
+                image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2Ij48cGF0aCBmaWxsPSIjZmZmZmZmIiBkPSJNMTMuNTIgMi42NWExLjEgMS4xIDAgMCAxIDAgMS41NmwtNy40IDcuNGExLjEgMS4xIDAgMCAxLTEuNTYgMGwtMy40LTMuNGExLjEgMS4xIDAgMSAxIDEuNTYtMS41NmwyLjYyIDIuNjIgNi42Mi02LjYyYTEuMSAxLjEgMCAwIDEgMS41NiAweiIvPjwvc3ZnPg==);
+            }
+            QListWidget::indicator:hover {
+                border-color: #4a90e2;
+            }
             QLineEdit:hover, QComboBox:hover, QListWidget:hover {
                 border-color: #4a90e2;
             }
@@ -1010,6 +1025,21 @@ class PackageDialog(QDialog):
                 background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px;
                 padding: 6px 10px; font-size: 13px; color: #2d3748;
                 min-height: 35px;
+            }
+            QListWidget::indicator {
+                width: 18px;
+                height: 18px;
+                background-color: #ffffff;
+                border: 2px solid #e2e8f0;
+                border-radius: 4px;
+            }
+            QListWidget::indicator:checked {
+                background-color: #4a90e2;
+                border-color: #4a90e2;
+                image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2Ij48cGF0aCBmaWxsPSIjZmZmZmZmIiBkPSJNMTMuNTIgMi42NWExLjEgMS4xIDAgMCAxIDAgMS41NmwtNy40IDcuNGExLjEgMS4xIDAgMCAxLTEuNTYgMGwtMy40LTMuNGExLjEgMS4xIDAgMSAxIDEuNTYtMS41NmwyLjYyIDIuNjIgNi42Mi02LjYyYTEuMSAxLjEgMCAwIDEgMS41NiAweiIvPjwvc3ZnPg==);
+            }
+            QListWidget::indicator:hover {
+                border-color: #4a90e2;
             }
             QLineEdit:hover, QListWidget:hover {
                 border-color: #4a90e2;

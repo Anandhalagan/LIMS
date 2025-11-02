@@ -1,5 +1,5 @@
 {
-  "use_glass": false,
+  "use_glass": true,
   "theme": "Premium Light",
   "inactivity_timeout_minutes": 30
 }
