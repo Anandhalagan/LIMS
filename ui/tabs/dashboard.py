@@ -621,8 +621,18 @@ class SmartNotification(QFrame):
     def setup_ui(self):
         self.setObjectName(f"smart-notification-{self.type}")
         self.setMinimumHeight(50)
+        self.setMinimumWidth(200)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        
+        # Make notification visually distinct on light backgrounds
+        self.setStyleSheet("""
+            QFrame#smart-notification-info { background-color: #e6f4ff; border: 1px solid #b6e0fe; border-radius: 8px; }
+            QFrame#smart-notification-success { background-color: #ecfdf5; border: 1px solid #bbf7d0; border-radius: 8px; }
+            QFrame#smart-notification-warning { background-color: #fff7ed; border: 1px solid #ffddb1; border-radius: 8px; }
+            QFrame#smart-notification-error { background-color: #fff1f2; border: 1px solid #ffb4c3; border-radius: 8px; }
+            QLabel#notification-message { color: #1a202c; }
+            QPushButton#notification-close { background: transparent; border: none; font-size: 14px; }
+        """)
+
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 8, 12, 8)
         
@@ -636,13 +646,16 @@ class SmartNotification(QFrame):
         message_label = QLabel(self.message)
         message_label.setObjectName("notification-message")
         message_label.setWordWrap(True)
+        # Force high-contrast text so message is visible regardless of parent stylesheet
+        message_label.setStyleSheet("color: white; font-weight: 600;")
         layout.addWidget(message_label)
-        
+
         # Close button
         close_btn = QPushButton("×")
         close_btn.setObjectName("notification-close")
         close_btn.setFixedSize(25, 25)
         close_btn.clicked.connect(self.fade_out)
+        close_btn.setStyleSheet("color: white; background: transparent; border: none;")
         layout.addWidget(close_btn)
 
     def setup_animations(self):
@@ -663,6 +676,12 @@ class SmartNotification(QFrame):
         self.fade_animation.setStartValue(0.0)
         self.fade_animation.setEndValue(1.0)
         self.fade_animation.start()
+        # Ensure the notification is on top of other widgets and visible
+        try:
+            self.raise_()
+            self.show()
+        except Exception:
+            pass
         super().showEvent(event)
 
 
@@ -680,12 +699,26 @@ class SmartNotificationSystem(QFrame):
         self.layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.layout.setSpacing(8)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
+        # Ensure notifications have space and a sensible minimum width so they are visible
+        self.setMinimumWidth(220)
 
     def show_notification(self, message, notification_type="info", duration=4000):
+        # Create and insert notification at top so newest are visible first
         notification = SmartNotification(message, notification_type, self)
-        self.layout.addWidget(notification)
-        self.notifications.append(notification)
-        
+        try:
+            self.layout.insertWidget(0, notification)
+        except Exception:
+            self.layout.addWidget(notification)
+        self.notifications.insert(0, notification)
+
+        # Show and raise to ensure visibility
+        try:
+            notification.show()
+            notification.raise_()
+            self.updateGeometry()
+        except Exception:
+            pass
+
         if duration > 0:
             QTimer.singleShot(duration, lambda: self.remove_notification(notification))
 

@@ -707,7 +707,7 @@ class MainWindow(QMainWindow):
         except Exception:
             cfg = {}
 
-        self.setWindowTitle("Clinical Lab Management System - Premium Edition")
+        self.setWindowTitle("AnandhLIMS")
         self.current_theme = cfg.get('theme', "Premium Light")
         self.use_glass = bool(cfg.get('use_glass', False))
         GlassFrame.set_use_glass(self.use_glass)
@@ -857,7 +857,7 @@ class MainWindow(QMainWindow):
                 self.hide()
                 self.tray_icon.show()
                 self.tray_icon.showMessage(
-                    "Clinical Lab Software - Premium", 
+                    "AnandhLIMS",
                     "Application minimized to system tray",
                     QSystemTrayIcon.MessageIcon.Information,
                     2000
@@ -949,7 +949,7 @@ class MainWindow(QMainWindow):
         """)
         title_container.addWidget(logo_label)
         
-        title_widget = QLabel("Clinical Lab Manager - Premium")
+        title_widget = QLabel("AnandhLIMS")
         title_widget.setStyleSheet("""
             QLabel {
                 color: #ffffff;
@@ -1540,8 +1540,8 @@ class MainWindow(QMainWindow):
         quick_start = QTextEdit()
         quick_start.setReadOnly(True)
         quick_start.setHtml("""
-        <h2>Quick Start Guide - Premium Edition</h2>
-        <p>Welcome to the Clinical Lab Management System Premium Edition.</p>
+        <h2>Quick Start Guide</h2>
+        <p>Welcome to AnandhLIMS.</p>
         <ul>
             <li>Use the tabs to navigate between different sections</li>
             <li>Press Ctrl+Shift+T to toggle between light and dark themes</li>
