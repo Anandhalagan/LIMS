@@ -93,15 +93,23 @@ class TestSelectionDialog(QDialog):
         self.department_filter.currentIndexChanged.connect(self.filter_tests_by_department)
         search_layout.addWidget(self.department_filter)
         layout.addLayout(search_layout)
+        # Use checkable items so users can explicitly check tests to include in the order
         self.test_list = QListWidget()
-        self.test_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self.test_list.setSelectionMode(QListWidget.SelectionMode.NoSelection)
+        # Small hint to improve discoverability
+        hint = QLabel("Tip: Check the tests you want to include in the order.")
+        hint.setStyleSheet('color: #718096; font-style: italic; margin: 4px 0 8px 0;')
+        hint.setToolTip("Check tests to include in the order. Use Select All to quickly choose all tests.")
+        layout.addWidget(hint)
         layout.addWidget(self.test_list)
         test_actions = QHBoxLayout()
         self.select_all_btn = QPushButton("Select All")
         self.select_all_btn.clicked.connect(self.select_all_tests)
+        self.select_all_btn.setToolTip("Check all visible tests")
         test_actions.addWidget(self.select_all_btn)
         self.clear_selection_btn = QPushButton("Clear Selection")
         self.clear_selection_btn.clicked.connect(self.clear_test_selection)
+        self.clear_selection_btn.setToolTip("Uncheck all tests")
         test_actions.addWidget(self.clear_selection_btn)
         layout.addLayout(test_actions)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -123,8 +131,12 @@ class TestSelectionDialog(QDialog):
                     item = QListWidgetItem(f"{t.code} - {t.name} ({t.department})")
                     item.setData(Qt.ItemDataRole.UserRole, t.id)
                     item.setData(Qt.ItemDataRole.UserRole + 1, t.department)
+                    # Make the item checkable and set checked state if pre-selected
+                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
                     if t.id in self.selected_test_ids:
-                        item.setSelected(True)
+                        item.setCheckState(Qt.CheckState.Checked)
+                    else:
+                        item.setCheckState(Qt.CheckState.Unchecked)
                     self.test_list.addItem(item)
         except Exception as e:
             logger.error(f"Error loading tests: {str(e)}")
@@ -145,15 +157,32 @@ class TestSelectionDialog(QDialog):
 
     def select_all_tests(self):
         for i in range(self.test_list.count()):
-            self.test_list.item(i).setSelected(True)
+            itm = self.test_list.item(i)
+            try:
+                itm.setCheckState(Qt.CheckState.Checked)
+            except Exception:
+                pass
 
     def clear_test_selection(self):
-        self.test_list.clearSelection()
+        for i in range(self.test_list.count()):
+            itm = self.test_list.item(i)
+            try:
+                itm.setCheckState(Qt.CheckState.Unchecked)
+            except Exception:
+                pass
 
     def get_selected_test_ids(self):
-        return [self.test_list.item(i).data(Qt.ItemDataRole.UserRole)
-                for i in range(self.test_list.count())
-                if self.test_list.item(i).isSelected()]
+        selected = []
+        for i in range(self.test_list.count()):
+            item = self.test_list.item(i)
+            try:
+                if item.checkState() == Qt.CheckState.Checked:
+                    selected.append(item.data(Qt.ItemDataRole.UserRole))
+            except Exception:
+                # fallback to selection if checkState not available
+                if item.isSelected():
+                    selected.append(item.data(Qt.ItemDataRole.UserRole))
+        return selected
 
 class PaymentDialog(QDialog):
     """Dialog for handling payment details with percent and amount discounts"""
@@ -1030,17 +1059,25 @@ class PackageDialog(QDialog):
         self.package_name.setAccessibleDescription("Text field for package name")
         layout.addWidget(self.package_name)
         layout.addWidget(QLabel("Select Tests:"))
+        # Small explanatory hint for packages
+        pkg_hint = QLabel("Tip: Check the tests you want to include in this package.")
+        pkg_hint.setStyleSheet('color: #718096; font-style: italic; margin: 4px 0 8px 0;')
+        pkg_hint.setToolTip("Check tests to include in the package. Save to persist the package.")
+        layout.addWidget(pkg_hint)
+        # Use checkable items for package test selection for explicit multi-select
         self.test_list = QListWidget()
-        self.test_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        self.test_list.setToolTip("Select one or more tests to include in the package")
-        self.test_list.setAccessibleDescription("List of tests for package creation")
+        self.test_list.setSelectionMode(QListWidget.SelectionMode.NoSelection)
+        self.test_list.setToolTip("Check tests to include in the package")
+        self.test_list.setAccessibleDescription("List of tests for package creation (check items to include)")
         layout.addWidget(self.test_list)
         test_actions = QHBoxLayout()
         self.select_all_btn = QPushButton("Select All")
         self.select_all_btn.clicked.connect(self.select_all_tests)
+        self.select_all_btn.setToolTip("Check all tests in the list")
         test_actions.addWidget(self.select_all_btn)
         self.clear_selection_btn = QPushButton("Clear Selection")
         self.clear_selection_btn.clicked.connect(self.clear_test_selection)
+        self.clear_selection_btn.setToolTip("Uncheck all tests in the list")
         test_actions.addWidget(self.clear_selection_btn)
         layout.addLayout(test_actions)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
@@ -1056,6 +1093,8 @@ class PackageDialog(QDialog):
                 for t in tests:
                     item = QListWidgetItem(f"{t.code} - {t.name} ({t.department})")
                     item.setData(Qt.ItemDataRole.UserRole, t.id)
+                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                    item.setCheckState(Qt.CheckState.Unchecked)
                     self.test_list.addItem(item)
         except Exception as e:
             logger.error(f"Error loading tests in PackageDialog: {str(e)}")
@@ -1067,30 +1106,50 @@ class PackageDialog(QDialog):
                 package = session.get(Package, package_id)
                 if package:
                     self.package_name.setText(package.name)
-                    test_ids = package.test_ids.split(',') if package.test_ids else []
+                    test_ids = [tid.strip() for tid in (package.test_ids.split(',') if package.test_ids else [])]
                     for i in range(self.test_list.count()):
                         item = self.test_list.item(i)
-                        if str(item.data(Qt.ItemDataRole.UserRole)) in test_ids:
-                            item.setSelected(True)
+                        try:
+                            if str(item.data(Qt.ItemDataRole.UserRole)) in test_ids:
+                                item.setCheckState(Qt.CheckState.Checked)
+                            else:
+                                item.setCheckState(Qt.CheckState.Unchecked)
+                        except Exception:
+                            pass
         except Exception as e:
             logger.error(f"Error loading package data: {str(e)}")
             QMessageBox.critical(self, "Error", f"Failed to load package: {str(e)}")
 
     def select_all_tests(self):
         for i in range(self.test_list.count()):
-            self.test_list.item(i).setSelected(True)
+            itm = self.test_list.item(i)
+            try:
+                itm.setCheckState(Qt.CheckState.Checked)
+            except Exception:
+                pass
 
     def clear_test_selection(self):
-        self.test_list.clearSelection()
+        for i in range(self.test_list.count()):
+            itm = self.test_list.item(i)
+            try:
+                itm.setCheckState(Qt.CheckState.Unchecked)
+            except Exception:
+                pass
 
     def save_package(self):
         package_name = self.package_name.text().strip()
         if not package_name:
             QMessageBox.warning(self, "Error", "Package name cannot be empty.")
             return
-        selected_tests = [self.test_list.item(i).data(Qt.ItemDataRole.UserRole)
-                         for i in range(self.test_list.count())
-                         if self.test_list.item(i).isSelected()]
+        selected_tests = []
+        for i in range(self.test_list.count()):
+            item = self.test_list.item(i)
+            try:
+                if item.checkState() == Qt.CheckState.Checked:
+                    selected_tests.append(item.data(Qt.ItemDataRole.UserRole))
+            except Exception:
+                if item.isSelected():
+                    selected_tests.append(item.data(Qt.ItemDataRole.UserRole))
         if not selected_tests:
             QMessageBox.warning(self, "Error", "At least one test must be selected.")
             return
@@ -1638,6 +1697,25 @@ class OrderTab(QWidget):
             self.clear_form()
             self.status_bar.showMessage(f"Orders placed successfully ({len(test_ids)} tests)")
             self.order_placed.emit()  # Emit signal to notify OrderSearchDialog
+            # Also proactively refresh other tabs (dashboard, results) in the MainWindow if present
+            try:
+                main_win = self.window()
+                if main_win and hasattr(main_win, 'tab_instances'):
+                    try:
+                        dash = main_win.tab_instances.get('dashboardTab')
+                        if dash and hasattr(dash, 'refresh_data'):
+                            dash.refresh_data()
+                    except Exception:
+                        logger.warning('Failed to refresh dashboard tab')
+                    try:
+                        results_tab = main_win.tab_instances.get('resultTab')
+                        if results_tab and hasattr(results_tab, 'refresh_data'):
+                            results_tab.refresh_data()
+                    except Exception:
+                        logger.warning('Failed to refresh results tab')
+            except Exception as e:
+                logger.warning(f"Failed to notify main window tabs after placing order: {e}")
+
             QMessageBox.information(self, "Success", "Orders placed successfully.")
             logger.info(f"Placed {len(test_ids)} orders for patient ID {patient_id}")
             pdf_path = generate_invoice(order_ids)

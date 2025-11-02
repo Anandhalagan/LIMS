@@ -175,7 +175,7 @@ def _serialize_model(obj):
     result = {}
     for col in obj.__table__.columns:
         val = getattr(obj, col.name)
-        if isinstance(val, datetime.datetime.datetime):
+        if isinstance(val, datetime.datetime):  # Fix: datetime.datetime -> datetime.datetime
             val = val.isoformat()
         result[col.name] = val
     return result

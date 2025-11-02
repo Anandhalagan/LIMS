@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QIntValidator, QIcon, QFont, QPalette, QColor
 from PyQt6.QtCore import Qt, QTimer, QDate, pyqtSignal
 from database import Session
-from models import Patient, cipher, generate_pid
+from models import Patient, Order, cipher, generate_pid
 from sqlalchemy.sql import and_
 import csv
 
@@ -842,28 +842,44 @@ class PatientTab(QWidget):
             patient = session.query(Patient).filter_by(id=patient_id).first()
             try:
                 if patient:
+                    # Check for existing orders first
+                    orders_count = session.query(Order).filter_by(patient_id=patient.id).count()
+                    if orders_count > 0:
+                        reply = QMessageBox.question(
+                            self, 
+                            "Related Records Found", 
+                            f"This patient has {orders_count} related order(s). Deleting will also remove all associated orders and results. Continue?",
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                        )
+                        if reply == QMessageBox.StandardButton.No:
+                            return
+
                     # Archive before deletion
                     try:
                         from models import archive_patient
                         deleted_by = self.current_user.id if hasattr(self.current_user, 'id') else None
                         archive_patient(session, patient, deleted_by=deleted_by)
                     except Exception as arch_err:
-                        # If archiving fails, abort delete and show error
                         session.rollback()
                         QMessageBox.critical(self, "Error", f"Failed to archive patient before deletion: {arch_err}")
                         return
 
                     # Now delete (cascade will handle related records)
-                    session.delete(patient)
-                    deleted_id = patient.id if patient else 0
-                    session.commit()
-                    QMessageBox.information(self, "Success", "Patient archived and deleted successfully.")
-                    # Notify other tabs that a patient was deleted (emit 0 to indicate deletion)
                     try:
-                        self.patient_saved.emit(0)
-                    except Exception:
-                        pass
-                    self.load_patients()
+                        session.delete(patient)
+                        deleted_id = patient.id if patient else 0
+                        session.commit()
+                        QMessageBox.information(self, "Success", "Patient and related records deleted successfully.")
+                        # Notify other tabs that a patient was deleted (emit 0 to indicate deletion)
+                        try:
+                            self.patient_saved.emit(0)
+                        except Exception:
+                            pass
+                        self.load_patients()
+                    except Exception as del_err:
+                        session.rollback()
+                        QMessageBox.critical(self, "Error", f"Failed to delete patient: {del_err}")
+                        return
                 else:
                     QMessageBox.warning(self, "Error", "Patient not found.")
             except Exception as e:

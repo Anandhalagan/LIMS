@@ -22,6 +22,7 @@ import csv
 import os
 import logging
 from datetime import datetime
+import atexit
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -749,6 +750,21 @@ class MainWindow(QMainWindow):
             "active_tabs": [],
             "actions_performed": 0
         }
+        # Ensure background threads are cleaned up on application quit
+        try:
+            app = QApplication.instance()
+            if app is not None:
+                try:
+                    app.aboutToQuit.connect(self._cleanup_threads)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        # Register atexit fallback to ensure threads are cleaned on interpreter shutdown
+        try:
+            atexit.register(self._cleanup_threads)
+        except Exception:
+            pass
 
     def eventFilter(self, obj, event):
         if event.type() in (QEvent.Type.MouseMove, QEvent.Type.KeyPress):
@@ -1638,14 +1654,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         try:
-            for tab_name, tab in self.tab_instances.items():
-                if hasattr(tab, 'cleanup'):
-                    tab.cleanup()
-                elif hasattr(tab, 'stop_thread'):
-                    tab.stop_thread()
-                if hasattr(tab, 'thread') and tab.thread and tab.thread.isRunning():
-                    tab.thread.quit()
-                    tab.thread.wait(1000)
+            # Reuse same cleanup logic to stop background threads
+            self._cleanup_threads()
         except Exception as e:
             logger.error(f"Error during tab cleanup: {e}")
         
@@ -1668,3 +1678,121 @@ class MainWindow(QMainWindow):
                 event.ignore()
         else:
             event.accept()
+
+    def _cleanup_threads(self):
+        """Stop/cleanup any background threads or long-running tasks owned by tabs.
+
+        This method is safe to call multiple times and is connected to
+        QApplication.aboutToQuit so threads are stopped before process exit.
+        """
+        try:
+            def _safe_hasattr(obj, name):
+                try:
+                    return hasattr(obj, name)
+                except RuntimeError:
+                    return False
+
+            def _safe_getattr(obj, name, default=None):
+                try:
+                    return getattr(obj, name)
+                except RuntimeError:
+                    return default
+                except Exception:
+                    return default
+
+            for tab_name, tab in list(getattr(self, 'tab_instances', {}).items()):
+                try:
+                    # Preferred explicit cleanup hooks on tabs
+                    if _safe_hasattr(tab, 'cleanup'):
+                        try:
+                            fn = _safe_getattr(tab, 'cleanup')
+                            if callable(fn):
+                                fn()
+                        except Exception:
+                            pass
+                    if _safe_hasattr(tab, 'stop_thread'):
+                        try:
+                            fn = _safe_getattr(tab, 'stop_thread')
+                            if callable(fn):
+                                fn()
+                        except Exception:
+                            pass
+
+                    # Common thread attribute names used in tabs (data_thread, export_thread, etc.)
+                    for common_name in ('data_thread', 'export_thread', 'worker_thread', 'thread'):
+                        th = _safe_getattr(tab, common_name, None)
+                        if th is None:
+                            continue
+                        try:
+                            # If the thread exposes a stop() method prefer that
+                            if _safe_hasattr(th, 'stop'):
+                                try:
+                                    fn = _safe_getattr(th, 'stop')
+                                    if callable(fn):
+                                        fn()
+                                except Exception:
+                                    pass
+
+                            # Then attempt a graceful quit/wait for QThread-like objects
+                            if _safe_hasattr(th, 'isRunning'):
+                                try:
+                                    is_running = _safe_getattr(th, 'isRunning')
+                                    if callable(is_running) and is_running():
+                                        if _safe_hasattr(th, 'quit'):
+                                            try:
+                                                fn = _safe_getattr(th, 'quit')
+                                                if callable(fn):
+                                                    fn()
+                                            except Exception:
+                                                pass
+                                        if _safe_hasattr(th, 'wait'):
+                                            try:
+                                                fn = _safe_getattr(th, 'wait')
+                                                if callable(fn):
+                                                    fn(2000)
+                                            except Exception:
+                                                pass
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+
+                    # As a last resort, scan attributes on the tab for any QThread-like instances
+                    for attr_name in dir(tab):
+                        try:
+                            attr = _safe_getattr(tab, attr_name, None)
+                            if attr is None:
+                                continue
+                            if _safe_hasattr(attr, 'isRunning') and callable(_safe_getattr(attr, 'isRunning')):
+                                try:
+                                    if _safe_getattr(attr, 'isRunning')():
+                                        if _safe_hasattr(attr, 'stop'):
+                                            try:
+                                                fn = _safe_getattr(attr, 'stop')
+                                                if callable(fn):
+                                                    fn()
+                                            except Exception:
+                                                pass
+                                        if _safe_hasattr(attr, 'quit'):
+                                            try:
+                                                fn = _safe_getattr(attr, 'quit')
+                                                if callable(fn):
+                                                    fn()
+                                            except Exception:
+                                                pass
+                                        if _safe_hasattr(attr, 'wait'):
+                                            try:
+                                                fn = _safe_getattr(attr, 'wait')
+                                                if callable(fn):
+                                                    fn(2000)
+                                            except Exception:
+                                                pass
+                                except Exception:
+                                    pass
+                        except Exception:
+                            # ignore attribute access exceptions
+                            pass
+                except Exception:
+                    logger.exception(f"Error cleaning tab {tab_name}")
+        except Exception:
+            logger.exception("Failed to cleanup threads in MainWindow")

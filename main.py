@@ -20,6 +20,7 @@ except ImportError as e:
 
 # Rest of your imports
 from PyQt6.QtWidgets import QApplication, QDialog
+from PyQt6.QtGui import QFontDatabase
 from ui.login_dialog import LoginDialog
 from ui.main_window import MainWindow
 from database import Session, Base, engine, init_db
@@ -66,6 +67,38 @@ def main():
 
     # Create application
     app = QApplication(sys.argv)
+    
+    # Register Inter fonts after QApplication creation
+    def register_inter_fonts():
+        """Load only a minimal set of Inter fonts required by the UI."""
+        try:
+            fonts_dir = resource_path("fonts")
+            if not os.path.isdir(fonts_dir):
+                print(f"Fonts directory not found: {fonts_dir}")
+                return
+
+            # Minimal set of required Inter fonts (18pt versions)
+            required = ["Inter_18pt-Regular.ttf", "Inter_18pt-Bold.ttf"]
+            loaded = 0
+            for fn in required:
+                path = os.path.join(fonts_dir, fn)
+                if not os.path.exists(path):
+                    print(f"Required font not found: {path}")
+                    continue
+                try:
+                    print(f"Loading font: {fn}")
+                    res = QFontDatabase.addApplicationFont(path)
+                    if res != -1:
+                        loaded += 1
+                        print(f"Successfully loaded font: {fn}")
+                except Exception as e:
+                    print(f"Failed to load font {fn}: {e}")
+
+            print(f"Loaded {loaded} Inter fonts from {fonts_dir}")
+        except Exception as e:
+            print(f"Error registering Inter fonts: {e}")
+
+    register_inter_fonts()
     
     # Set application properties
     app.setApplicationName("Clinical Laboratory Software")
