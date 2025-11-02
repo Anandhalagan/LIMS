@@ -1,0 +1,11 @@
+PyQt6
+PyQt6-Qt6
+PyQt6-sip
+#sqlite3  # Usually included in Python
+reportlab  # For PDF generation
+pillow    # For image handling if neededpip install pyinstaller
+sqlalchemy
+cryptography
+PyQt6.QtCharts
+        pip install --index-url https://www.riverbankcomputing.com/pypi/simple/ --upgrade PyQt6
+        pip install --index-url https://www.riverbankcomputing.com/pypi/simple/ --pre --upgrade PyQt6-Charts

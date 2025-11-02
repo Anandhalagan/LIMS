@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+lims/
+*/Scripts/
+*/Lib/site-packages/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Reports, logs, backups, DB and sensitive files
+*.pdf
+*.log
+lab.db
+lab.db.backup*
+lab.sqbpro
+encryption_key.key
+ui/encryption_key.key
+reports/*.pdf
+reports/*.backup
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# compiled C extensions
+*.so
+
+# node / other
+node_modules/
+
+# Ignore the packaged build folder (if any)
+ClinicalLabSoftware/
+
+# keep track of this .gitignore itself
+!/.gitignore
