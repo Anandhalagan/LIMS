@@ -1564,6 +1564,21 @@ class OrderTab(QWidget):
             logger.error(f"Error loading patients: {str(e)}")
             QMessageBox.critical(self, "Error", f"Failed to load patients: {str(e)}")
 
+    def select_patient_by_id(self, patient_id: int):
+        """Reloads the patient combo and selects the provided patient_id if present."""
+        try:
+            # Refresh the combo so new entries are present
+            self.load_combos()
+            if not patient_id:
+                return
+            index = self.patient_combo.findData(patient_id)
+            if index >= 0:
+                self.patient_combo.setCurrentIndex(index)
+                # Ensure any dependent UI updates happen
+                self.patient_combo.repaint()
+        except Exception as e:
+            logger.error(f"Error selecting patient by id {patient_id}: {e}")
+
     def place_order(self):
         try:
             patient_id = self.patient_combo.currentData()

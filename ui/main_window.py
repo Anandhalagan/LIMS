@@ -1087,6 +1087,33 @@ class MainWindow(QMainWindow):
             
             self.tab_instances[obj_name] = tab_widget
         
+        # Connect cross-tab signals: when patients are changed notify order tab to reload
+        try:
+            patient_tab = self.tab_instances.get('patientTab')
+            order_tab = self.tab_instances.get('orderTab')
+            if patient_tab and order_tab and hasattr(patient_tab, 'patient_saved'):
+                # patient_saved now emits an int patient_id; reload combos and auto-select the new patient if provided
+                patient_tab.patient_saved.connect(lambda pid, ot=order_tab: (ot.load_combos(), ot.select_patient_by_id(pid) if pid else None))
+            # Connect patient_open_in_order to switch to Orders tab and select the patient
+            if patient_tab and order_tab and hasattr(patient_tab, 'patient_open_in_order'):
+                def _open_orders_for_patient(pid, ot=order_tab):
+                    try:
+                        idx = [i for i, (_, _, _, obj_name, _) in enumerate(self.TAB_CONFIG) if obj_name == 'orderTab'][0]
+                        self.tabs.setCurrentIndex(idx)
+                        # Ensure combos are up-to-date and select the patient
+                        try:
+                            ot.load_combos()
+                        except Exception:
+                            pass
+                        if pid:
+                            ot.select_patient_by_id(pid)
+                    except Exception:
+                        logger.exception('Failed to open Orders tab for patient')
+                patient_tab.patient_open_in_order.connect(_open_orders_for_patient)
+        except Exception:
+            # Non-fatal: if connection fails, continue without breaking UI
+            logger.exception('Failed to connect patient_saved signal to order tab')
+
         self.tabs.currentChanged.connect(self._animate_tab_change)
         
         if self.tabs.count() > 0:

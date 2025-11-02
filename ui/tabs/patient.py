@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox, QScrollArea, QDateEdit, QFileDialog
 )
 from PyQt6.QtGui import QIntValidator, QIcon, QFont, QPalette, QColor
-from PyQt6.QtCore import Qt, QTimer, QDate
+from PyQt6.QtCore import Qt, QTimer, QDate, pyqtSignal
 from database import Session
 from models import Patient, cipher, generate_pid
 from sqlalchemy.sql import and_
@@ -350,6 +350,11 @@ class SearchDialog(QDialog):
             QMessageBox.critical(self, "Error", f"Failed to export results: {e}")
 
 class PatientTab(QWidget):
+    # Signal emitted when patients are created/updated/deleted so other tabs can refresh
+    # Emits the patient id (int) when a patient is created/updated, or 0 when deleted
+    patient_saved = pyqtSignal(int)
+    # Signal emitted when user wants to open Orders tab for a specific patient
+    patient_open_in_order = pyqtSignal(int)
     def __init__(self, current_user=None):
         super().__init__()
         # Store current user (MainWindow will pass current_user when available)
@@ -520,6 +525,16 @@ class PatientTab(QWidget):
         self.clear_btn.setToolTip("Clear all input fields")
         btn_layout.addWidget(self.clear_btn)
 
+        # Button to open Orders tab with selected patient
+        self.open_in_order_btn = QPushButton("Order For Patient")
+        self.open_in_order_btn.setIcon(QIcon("icons/order_icon.png"))
+        self.open_in_order_btn.clicked.connect(self.open_in_orders_tab)
+        self.open_in_order_btn.setMinimumHeight(32)
+        self.open_in_order_btn.setMinimumWidth(120)
+        self.open_in_order_btn.setToolTip("Open Orders tab and select the highlighted patient")
+        self.open_in_order_btn.setObjectName("open_in_order_btn")
+        btn_layout.addWidget(self.open_in_order_btn)
+
         btn_layout.addStretch()
         self.form_layout.addLayout(btn_layout, 0, 2, 7, 1)
         self.form_layout.setColumnStretch(1, 1)
@@ -582,6 +597,7 @@ class PatientTab(QWidget):
             #save_btn { background-color: #28a745; color: white; }
             #refresh_btn { background-color: #17a2b8; color: white; }
             #search_btn { background-color: #007bff; color: white; }
+            #open_in_order_btn { background-color: #007bff; color: white; }
             #edit_btn { background-color: #ffc107; color: #212529; }
             #delete_btn { background-color: #dc3545; color: white; }
             #address_btn { background-color: #6f42c1; color: white; }
@@ -598,6 +614,7 @@ class PatientTab(QWidget):
         self.delete_btn.setObjectName("delete_btn")
         self.address_btn.setObjectName("address_btn")
         self.clear_btn.setObjectName("clear_btn")
+        self.open_in_order_btn.setObjectName("open_in_order_btn")
 
     def open_address_dialog(self):
         current_address = self.address_input.text()
@@ -609,6 +626,19 @@ class PatientTab(QWidget):
     def open_search_dialog(self):
         dialog = SearchDialog(self)
         dialog.exec()
+
+    def open_in_orders_tab(self):
+        # Use selected row in the patients table to identify patient
+        selected_rows = self.table.selectionModel().selectedRows()
+        if not selected_rows:
+            QMessageBox.warning(self, "Error", "Please select a patient from the table to open in Orders tab.")
+            return
+        row = selected_rows[0].row()
+        try:
+            patient_id = int(self.table.item(row, 0).text())
+            self.patient_open_in_order.emit(patient_id)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to determine selected patient: {e}")
 
     def save_patient(self):
         title = self.title_input.currentText().strip()
@@ -668,6 +698,17 @@ class PatientTab(QWidget):
             patient.address = cipher.encrypt(address.encode()).decode() if address else None
             session.add(patient)
             session.commit()
+            # Notify other tabs (e.g., OrderTab) that a patient was created
+            try:
+                self.patient_saved.emit(patient.id if patient and patient.id else 0)
+                # Also request Orders tab to open for this patient so it becomes selected
+                if patient and patient.id:
+                    try:
+                        self.patient_open_in_order.emit(patient.id)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
             QMessageBox.information(self, "Success", f"Patient saved with PID: {pid}")
             self.clear_inputs()
             self.load_patients()
@@ -753,6 +794,17 @@ class PatientTab(QWidget):
                 patient.address = cipher.encrypt(address.encode()).decode() if address else None
                 session.commit()
                 QMessageBox.information(self, "Success", "Patient updated successfully.")
+                # Notify other tabs that patient data changed (emit updated patient id)
+                try:
+                    self.patient_saved.emit(patient_id if patient_id else 0)
+                    # Also open Orders tab for this updated patient
+                    if patient_id:
+                        try:
+                            self.patient_open_in_order.emit(patient_id)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
                 self.clear_inputs()
                 self.load_patients()
                 self.save_btn.setText("Save Patient")
@@ -803,8 +855,14 @@ class PatientTab(QWidget):
 
                     # Now delete (cascade will handle related records)
                     session.delete(patient)
+                    deleted_id = patient.id if patient else 0
                     session.commit()
                     QMessageBox.information(self, "Success", "Patient archived and deleted successfully.")
+                    # Notify other tabs that a patient was deleted (emit 0 to indicate deletion)
+                    try:
+                        self.patient_saved.emit(0)
+                    except Exception:
+                        pass
                     self.load_patients()
                 else:
                     QMessageBox.warning(self, "Error", "Patient not found.")
