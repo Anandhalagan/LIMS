@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import csv
 import datetime
 import logging
@@ -28,7 +29,17 @@ from PyQt6.QtCharts import (
     QPieSeries, QPieSlice, QLineSeries, QAreaSeries, QSplineSeries, QScatterSeries,
     QDateTimeAxis, QLegend
 )
-from database import Session
+# When running this module directly (e.g. python ui/tabs/dashboard.py) the
+# project root may not be on sys.path which causes "No module named 'database'".
+# Try a normal import first and fall back to inserting the repo root into
+# sys.path so the top-level modules (database, models, etc.) can be imported.
+try:
+    from database import Session
+except ModuleNotFoundError:
+    _repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    if _repo_root not in sys.path:
+        sys.path.insert(0, _repo_root)
+    from database import Session
 from models import Order, Patient, Test, cipher
 from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.sql import func
